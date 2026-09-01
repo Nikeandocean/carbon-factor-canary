@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import NoReturn
 
 INITIALIZE_TIMEOUT_S = 900  # cold start: the npm wrapper may pip-install torch
-CALL_TIMEOUT_S = 600  # first Pro call may download the embedding model (~400 MB)
+CALL_TIMEOUT_S = 1800  # first Pro call may download the embedding model (~400 MB)
 
 EXPECTED_TOOLS = {"factor_match", "factor_search", "factor_detail"}
 ACTIVITY = "cement production, rotary kiln"

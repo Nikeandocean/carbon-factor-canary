@@ -36,6 +36,11 @@ jobs:
           path: ~/.cache/huggingface
           key: hf-text2vec-base-chinese
 
+      - name: Warm HF model cache (embedding model for the Pro path)
+        run: |
+          pip install -q huggingface_hub
+          python -c "from huggingface_hub import snapshot_download; snapshot_download('shibing624/text2vec-base-chinese')"
+
       - name: Guard - license secret must be configured
         env:
           KEY: ${{ secrets.CARBON_FACTOR_LICENSE_KEY }}
