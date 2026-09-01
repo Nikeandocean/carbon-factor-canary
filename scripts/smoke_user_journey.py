@@ -35,7 +35,7 @@ SEARCH_TIMEOUT_S = 120  # Free path: a single live API round-trip
 # deliberate cold-cache run.
 MATCH_TIMEOUT_S = int(os.environ.get("CANARY_MATCH_TIMEOUT_S", "300"))
 
-EXPECTED_TOOLS = {"factor_match", "factor_search", "factor_detail"}
+EXPECTED_TOOLS = {"factor_search", "factor_detail", "factor_match", "process_inventory"}
 ACTIVITY = "cement production, rotary kiln"
 
 
@@ -258,6 +258,36 @@ def main() -> None:
     if not search_data.get("factors"):
         fail(f"factor_search returned no factors: {json.dumps(search)[:300]}", client)
     log(f"factor_search OK: {len(search_data['factors'])} factors via live API")
+
+    # -- Phase 3b: process_inventory (regression guard for the empty-query
+    # crash fixed in 2.3.9). This tool previously called the API with an empty
+    # query (HTTP 400, unhandled) and crashed on every invocation. It now fetches
+    # a candidate pool per activity, so a real call must return a processed
+    # report, not an error. Runs on both Free and Pro tiers.
+    try:
+        inv = parse_tool_payload(
+            client.request(
+                "tools/call",
+                {"name": "process_inventory",
+                 "arguments": {"activities_json": json.dumps([
+                     {"name": "cement production", "unit": "kg"},
+                     {"name": "diesel", "unit": "L"},
+                     {"name": "electricity", "unit": "kWh"},
+                 ])}},
+                timeout_s=SEARCH_TIMEOUT_S,
+            ),
+            "process_inventory",
+        )
+    except (TimeoutError, ConnectionError, RuntimeError, AssertionError, json.JSONDecodeError) as e:
+        fail(f"process_inventory failed (regression of the 2.3.9 empty-query crash?): {e}", client)
+    if "error" in inv:
+        fail(f"process_inventory returned error: {inv['error']}", client)
+    if "original_count" not in inv:
+        fail(f"process_inventory returned no 'original_count' -- did not process. "
+             f"Payload: {json.dumps(inv)[:300]}", client)
+    log(f"process_inventory OK: {inv.get('original_count')} activities processed, "
+        f"{inv.get('deduplicated_count')} after dedup, "
+        f"{len(inv.get('substitutions', []))} substitutions")
 
     # -- Phase 4: factor_match (Pro path: hybrid + quality ratings) ----------
     # Asserts the paid features are actually engaged, catching silent
