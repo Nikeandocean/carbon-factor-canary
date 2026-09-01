@@ -17,7 +17,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 45
+    # Worst case is initialize (capped at 900s by the script) plus factor_match
+    # (capped at 300s). 45 gave a hung run half an hour of wall clock before
+    # failing; 25 is still comfortable and keeps a bad runner from burning
+    # noticeable billable time.
+    timeout-minutes: 25
     defaults:
       run:
         shell: bash
@@ -37,6 +41,10 @@ jobs:
           key: hf-text2vec-base-chinese
 
       - name: Warm HF model cache (embedding model for the Pro path)
+        # Bounded separately so a cold download that stalls reports as this
+        # step timing out, instead of surfacing later as an opaque hang inside
+        # the server's request handler.
+        timeout-minutes: 10
         run: |
           pip install -q huggingface_hub
           python -c "from huggingface_hub import snapshot_download; snapshot_download('shibing624/text2vec-base-chinese')"

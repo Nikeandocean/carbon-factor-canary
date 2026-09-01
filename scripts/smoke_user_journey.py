@@ -25,7 +25,15 @@ from pathlib import Path
 from typing import NoReturn
 
 INITIALIZE_TIMEOUT_S = 900  # cold start: the npm wrapper may pip-install torch
-CALL_TIMEOUT_S = 1800  # first Pro call may download the embedding model (~400 MB)
+# Pro and Free paths have very different latency profiles, so they get
+# separate budgets instead of one generous shared constant.
+SEARCH_TIMEOUT_S = 120  # Free path: a single live API round-trip
+# Pro path: load the embedding model from the warm HF cache, then inference.
+# The workflow pre-warms ~/.cache/huggingface before the server starts, so
+# this is a local load, not a ~400 MB download. Observed warm-cache latency
+# is ~4s, leaving a ~75x margin. Raise via CANARY_MATCH_TIMEOUT_S for a
+# deliberate cold-cache run.
+MATCH_TIMEOUT_S = int(os.environ.get("CANARY_MATCH_TIMEOUT_S", "300"))
 
 EXPECTED_TOOLS = {"factor_match", "factor_search", "factor_detail"}
 ACTIVITY = "cement production, rotary kiln"
@@ -240,7 +248,7 @@ def main() -> None:
             client.request(
                 "tools/call",
                 {"name": "factor_search", "arguments": {"query": "electricity", "limit": 3}},
-                timeout_s=CALL_TIMEOUT_S,
+                timeout_s=SEARCH_TIMEOUT_S,
             ),
             "factor_search",
         )
@@ -271,12 +279,18 @@ def main() -> None:
                 "tools/call",
                 {"name": "factor_match",
                  "arguments": {"activity_data": ACTIVITY, "top_k": 5}},
-                timeout_s=CALL_TIMEOUT_S,
+                timeout_s=MATCH_TIMEOUT_S,
             ),
             "factor_match",
         )
     except (TimeoutError, ConnectionError, RuntimeError, AssertionError, json.JSONDecodeError) as e:
-        fail(f"factor_match failed: {e}", client)
+        fail(f"factor_match failed: {e}\n"
+             "hint: the Pro path loads a sentence-transformers model on first call. "
+             "If the HF cache is cold, that load happens inside the request handler "
+             "and has been observed to stall indefinitely on windows-latest. Check "
+             "the 'Warm HF model cache' step and whether actions/cache hit its key "
+             "above; if a cold run is intentional, raise CANARY_MATCH_TIMEOUT_S.",
+             client)
     t_match = time.monotonic() - t_match
 
     data = match.get("data") or {}
