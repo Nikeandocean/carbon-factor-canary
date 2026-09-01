@@ -122,7 +122,13 @@ class StdioMcpClient:
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
-                log(f"ignoring non-JSON stdout line: {raw[:120]!r}")
+                # Log the full line. pip (run by the npm wrapper on a cold
+                # start) prints "Downloading <pkg>-<version>.whl" /
+                # "Successfully installed ..." to stdout; truncating hid the
+                # patch version (e.g. "2.3.8" -> "2.3.") and forced a manual
+                # re-check of the raw CI log zip to see which build actually
+                # got installed.
+                log(f"ignoring non-JSON stdout line: {raw!r}")
                 continue
             if msg.get("id") == req_id and ("result" in msg or "error" in msg):
                 if "error" in msg:
