@@ -280,14 +280,17 @@ def main() -> None:
         )
     except (TimeoutError, ConnectionError, RuntimeError, AssertionError, json.JSONDecodeError) as e:
         fail(f"process_inventory failed (regression of the 2.3.9 empty-query crash?): {e}", client)
-    if "error" in inv:
-        fail(f"process_inventory returned error: {inv['error']}", client)
-    if "original_count" not in inv:
+    # parse_tool_payload returns the tool's structuredContent, which is wrapped
+    # as {"data": {...}} (same shape as the other tools' payloads).
+    inv_data = inv.get("data") or {}
+    if "error" in inv_data:
+        fail(f"process_inventory returned error: {inv_data['error']}", client)
+    if "original_count" not in inv_data:
         fail(f"process_inventory returned no 'original_count' -- did not process. "
              f"Payload: {json.dumps(inv)[:300]}", client)
-    log(f"process_inventory OK: {inv.get('original_count')} activities processed, "
-        f"{inv.get('deduplicated_count')} after dedup, "
-        f"{len(inv.get('substitutions', []))} substitutions")
+    log(f"process_inventory OK: {inv_data.get('original_count')} activities processed, "
+        f"{inv_data.get('deduplicated_count')} after dedup, "
+        f"{len(inv_data.get('substitutions', []))} substitutions")
 
     # -- Phase 4: factor_match (Pro path: hybrid + quality ratings) ----------
     # Asserts the paid features are actually engaged, catching silent
