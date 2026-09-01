@@ -15,6 +15,7 @@ from __future__ import annotations
 import json
 import os
 import queue
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -158,6 +159,23 @@ def parse_tool_payload(result: dict, tool: str) -> dict:
     raise AssertionError(f"{tool} returned no text content: {result}")
 
 
+def resolve_windows_command(cmd: list[str]) -> list[str]:
+    """Make a bare command like 'npx' executable via Popen on Windows.
+
+    CreateProcess cannot find or execute 'npx' directly: it is npx.cmd, and
+    .cmd/.bat files must go through the command interpreter.
+    """
+    if os.name != "nt":
+        return cmd
+    resolved = shutil.which(cmd[0])
+    if resolved is None:
+        return cmd  # let Popen raise with its usual diagnostic
+    cmd = [resolved] + cmd[1:]
+    if resolved.lower().endswith((".cmd", ".bat")):
+        cmd = ["cmd", "/c"] + cmd
+    return cmd
+
+
 def main() -> None:
     if "--" not in sys.argv:
         sys.exit(f"usage: {Path(sys.argv[0]).name} -- <server launch command...>\n"
@@ -165,6 +183,7 @@ def main() -> None:
     cmd = sys.argv[sys.argv.index("--") + 1:]
     if not cmd:
         sys.exit("server command is required after --")
+    cmd = resolve_windows_command(cmd)
 
     log(f"launching server as a user would: {cmd}")
     t_start = time.monotonic()
