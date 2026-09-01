@@ -3,6 +3,10 @@
 # auto-installs from PyPI), performs a real MCP stdio handshake, and asserts
 # the Pro tier is genuinely engaged -- catching startup crashes, launcher
 # regressions (e.g. macOS python3), and silent Pro->Free degradation.
+#
+# This job runs WARM: the model cache is pre-populated below, so it cannot
+# reproduce cold-start failures. Those are covered by cold-start-smoke.yml
+# (weekly, cold cache). Keep the smoke invocation in sync with that file.
 name: user-journey-smoke
 
 on:
