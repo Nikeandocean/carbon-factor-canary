@@ -79,6 +79,8 @@ class StdioMcpClient:
         self._proc.stdin.flush()
 
         deadline = time.monotonic() + timeout_s
+        started = time.monotonic()
+        next_heartbeat = started + 60
         while True:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -94,6 +96,16 @@ class StdioMcpClient:
                         f"Server exited (code {self._proc.returncode}) while waiting for '{method}'. "
                         f"Server stderr tail:\n{self._stderr_tail()}"
                     ) from None
+                # Heartbeat: long silent waits (e.g. a hung model load) are
+                # otherwise a black box until the final timeout. NB: the
+                # server's stderr temp file is NOT read here -- on Windows the
+                # child's inherited handle shares the file pointer, so seeking
+                # from the parent mid-flight would corrupt its writes.
+                if time.monotonic() >= next_heartbeat:
+                    elapsed = time.monotonic() - started
+                    log(f"waiting for '{method}'... {elapsed:.0f}s elapsed, "
+                        f"server alive={self._proc.poll() is None}")
+                    next_heartbeat += 60
                 continue
             if raw is None:
                 try:
