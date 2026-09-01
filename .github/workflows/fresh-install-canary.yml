@@ -1,0 +1,25 @@
+# Tier 1: cheap, frequent canary on a clean environment.
+# Installs the latest PyPI release into a brand-new venv and imports the
+# server. Catches dependency-resolution breakage the same day an upstream
+# release lands -- the failure mode that shipped in v2.3.4 and took a
+# paying user's bug report to discover.
+name: fresh-install-canary
+
+on:
+  schedule:
+    - cron: '37 */6 * * *' # every 6h, off the hour
+  workflow_dispatch:
+
+jobs:
+  fresh-install:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Fresh install + import probe
+        run: python scripts/fresh_install_check.py
