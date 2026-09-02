@@ -18,7 +18,7 @@
 user-journey 用真实 Pro license 调 `factor_match`，断言：
 
 - 返回含 `candidates`（而非 Free 的 `factors`）——混合检索真的在工作
-- 候选含 `hybrid_score` / `quality_ratings` / `final_score`——质量评级没退化
+- 候选含 `hybrid_score` / `final_score`——混合评分没退化
 - 无 `upgrade_hint`——Pro 身份被正确识别
 
 ## 告警

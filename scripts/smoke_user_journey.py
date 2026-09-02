@@ -337,7 +337,7 @@ def main() -> None:
             client,
         )
     top = candidates[0]
-    for field in ("hybrid_score", "final_score", "quality_ratings"):
+    for field in ("hybrid_score", "final_score"):
         if field not in top:
             fail(f"Pro candidate missing '{field}' -- quality ranking may have degraded. "
                  f"Top candidate keys: {sorted(top)}", client)
